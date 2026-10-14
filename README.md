@@ -4,21 +4,28 @@
 
 Task Clarifier 是一个面向 Codex 的需求澄清与模型选择 Skill：把还没理顺的语音或文字想法，通过持续讨论整理成一份**清楚、精简、可直接交给工作对话执行的提示词**，并按任务难度建议模型、推理强度和必要的协作方式。
 
-你不必一开始就会写提示词，也不用把要求一次讲完。先说个大概，想到新条件时继续补充，发现理解错了就纠正。Skill 会维护同一份需求草稿，只追问可能改变任务方向的关键问题；目标明确后，给出精简完整的提示词和模型、推理强度建议。
+你不必一开始就会写提示词，也不用把要求一次讲完。先说个大概，想到新条件时继续补充，发现理解错了就纠正。Skill 会维护同一份需求草稿，只追问影响核心目标和范围的问题；明确提出工作任务或需求足够清楚时，本轮就给精简提示词和模型、推理强度建议，无需再说“输出提示词”。
 
-## 本次更新｜2026-10-10
+## 本次更新｜2026-10-14
 
-- 更名为 **Task Clarifier**，突出持续澄清需求、编写精简任务提示词并推荐模型与协作方式的核心能力。
-- 关联工作对话后，每轮答疑、补充和改稿前都刷新进度，按完成、进行中和阻塞状态决定下一步。
-- 提示词围绕目标精简，只保留影响执行的上下文、约束和交付要求；失败任务再次尝试时须有新证据或方法变化。
-- 默认给一份完整任务提示词；按任务难度选择模型与推理强度，复杂任务可由 Sol/Astra 主模型按需分配 Luna X-High，并由主模型负责整合交付。
+- 明确工作请求、可交接的需求及已有任务的补充纠正，本轮主动交提示词，减少连续讨论却迟迟不交稿；“先讨论、暂不交稿、确认后再写”的边界优先。
+- “写完整需求文档”等请求生成让工作对话执行的提示词；只追问核心目标或范围歧义，普通细节和待查事实交工作模型处理，未定规则不擅自补成要求。
+- 持续模式每轮提醒先取得关联工作对话的实际读取结果，缺相关决定或纠正时补历史；读取失败说明缺口，可以交标注的临时稿。
+- 支持按讨论对话保存工作对话 UUID，恢复时注入正确关联；保留更名前的状态兼容，维护本 Skill 不开启或清除已有模式。更名后的 Hook 命令须指向新脚本路径。
+- 提示词交稿前合并重复要求、删已知背景和套话，保留关键约束；继续推荐具体模型与强度，复杂任务仍可由主模型按需统筹 Luna。
+- 新增隔离状态与 Hook 事件回归测试，覆盖连续跟进、启动与压缩恢复、关联替换、旧状态、退出及登记失败。脚本测试不代表真实模型行为已获保证。
+- 修正受限 Windows 目录中的状态写入可能长时间重试的问题；无权限时及时报出登记失败，继续处理本轮需求。
 
-## Latest update — 2026-10-10
+## Latest update — 2026-10-14
 
-- Renamed to **Task Clarifier** to emphasize its core capabilities: clarifying requirements, drafting concise task prompts, and recommending models and collaboration.
-- Refresh the linked work chat before every discussion, correction, and prompt revision; use current completion, active-work, and blocker evidence to choose next steps.
-- Keep prompts concise and centered on the outcome, preserving only relevant context, constraints, and deliverables. Repeated attempts need new evidence or a changed approach.
-- Prefer one end-to-end task prompt. Route by task difficulty and reasoning effort; let a capable Sol/Astra host use Luna X-High workers when useful and own final integration.
+- Deliver a prompt in the current turn for explicit work requests, sufficiently clear tasks, and task corrections; honor requests to discuss first or wait for confirmation.
+- Treat “write a requirements document” as a handoff to the work chat. Leave ordinary implementation details and research questions to that model without inventing confirmed requirements.
+- Require actual current-turn linked-chat reads before replying; fetch relevant history when needed and disclose read failures in provisional drafts.
+- Persist an optional work-chat UUID per discussion chat and restore it with the mode. Keep legacy state compatible; renamed installations need hook commands pointing to the new script path.
+- Trim repeated context and boilerplate while preserving constraints, concrete model/effort recommendations, and optional host-led Luna collaboration.
+- Add isolated hook/state regression tests. Passing script tests does not guarantee real model compliance.
+- Fail promptly on restricted Windows state writes instead of retrying until the hook times out.
+
 ## 30 秒看懂它怎么帮你
 
 ~~~mermaid
@@ -46,7 +53,7 @@ Task Clarifier 把这个过程变成一份持续维护的需求草稿：
 | 说完后又想起要求 | 把新信息并入同一份草稿，不必从头重讲 |
 | 发现方向理解错了 | 更新有误的部分，同时保留仍适用的要求 |
 | 不确定还要回答多少问题 | 只追问会改变方案的关键缺口，普通细节留给工作阶段 |
-| 不知道怎么交给另一个对话 | 输出完整、可复制的提示词，以及模型和推理强度建议 |
+| 明确提出任务却一直聊、迟迟没有执行稿 | 本轮主动给完整精简提示词及选型，不要求另说“输出提示词” |
 | 项目进行到一半，不知下一步做什么 | 关联后每轮先读取最新进展，再据此讨论、修订或建议下一步 |
 
 它尤其适合语音输入、边想边说、需求经常变化、需要多轮整理的场景。简单而明确的问题直接问 Codex 就可以，不必额外启用它。
@@ -75,7 +82,9 @@ $task-clarifier
 候补按提交时间排序，这点也加上。
 ~~~
 
-讨论清楚后，说“输出提示词”或“整理成最终提示词”。Task Clarifier 会把兼容的要求合并成一份**精简完整草稿**，同时给出具体模型名、推理强度和必要的协作建议。你决定何时把它复制到工作对话继续推进。
+你明确提出任务，或目标和重要范围已足够清楚，Task Clarifier 就会把兼容要求合并成一份**精简完整提示词**，同时给出具体模型名、推理强度和必要的协作建议。也可以随时说“输出提示词”；说“先讨论，暂时别出提示词”则先讨论。你决定何时复制到工作对话继续推进。
+
+例如，“我需要一份完整的存档管理需求文档”会生成让工作对话撰写文档的提示词；无需先把文档每条规则都聊完，也不会在讨论对话直接替工作模型写完整文档。
 
 > **不用特殊格式，也不用先学会写提示词。** “补充”“纠正”“输出提示词”“下一步”都可以直接说。
 
@@ -144,9 +153,9 @@ flowchart TB
 2. **references/** 补充需求澄清、口述整理、模型选择、协作判断和状态恢复方法。
 3. **session_mode.py** 可接收受支持的 Codex Hook 事件，登记当前对话是否处于需求讨论模式。
 4. 如果你自行配置并信任 Hook，后续事件可按当前对话 UUID 恢复模式状态。
-5. **需求正文仍在 Codex 对话上下文中。** Hook 状态文件只记录 UUID、启用状态、来源和更新时间，不保存需求正文或聊天内容。
+5. **需求正文仍在 Codex 对话上下文中。** Hook 状态文件记录当前对话 UUID、启用状态、来源、更新时间和可选工作对话 UUID，不保存需求正文、读取结果或聊天内容。
 
-Hook 是可选的，需要用户在 Codex 环境中自行配置并信任；仓库不会自动更改 Codex 设置或安装 Hook。Hook 只帮助恢复模式状态，不能找回已经丢失的聊天历史。
+Hook 是可选的，需要用户在 Codex 环境中自行配置并信任；仓库不会自动更改 Codex 设置或安装 Hook。Hook 帮助恢复模式和关联，不能找回已经丢失的聊天历史，也不能代替每轮实际读取。更名后请核对命令中的脚本路径；命令变更需 Codex 正常审阅。
 
 ## 安装
 
@@ -159,7 +168,7 @@ Hook 是可选的，需要用户在 Codex 环境中自行配置并信任；仓�
 
 ## 行为边界与隐私
 
-- 只有明确调用 skill 才会开启需求讨论模式；引用、代码块或聊天标题中的调用文字不会单独启用。
+- 可明确调用 Skill，也可由模型按需求澄清与交接意图选择；Hook 只自动登记明确调用，语义选择需模型补登记。引用、代码块或聊天标题中的调用文字不会单独启用。
 - 默认交付需求草稿和工作提示词，不会因为“继续”“实现”或“下一步”就擅自修改项目或启动任务。
 - “下一步”需要读取最新项目进度时，只能依据当前可访问的对话或项目材料；读不到会说明缺口。
 - Hook 状态文件不含需求正文；它无法代替对话历史，也不能恢复已丢失的聊天内容。
@@ -179,10 +188,16 @@ Hook 是可选的，需要用户在 Codex 环境中自行配置并信任；仓�
 | **references/session-persistence.md** | Hook、状态登记、恢复与核验边界 |
 | **references/active-project.md** | 用户本地填写的活动项目对话指针模板 |
 | **scripts/session_mode.py** | Hook 事件解析与每对话状态辅助脚本 |
+| **tests/test_session_mode.py** | 隔离的状态转换、关联和 Hook 事件回归测试 |
+| **tests/behavior-cases.md** | 基于实际使用问题的真实对话验收场景 |
+
+## 验证
+
+运行 `python -X utf8 -B -m unittest discover -s tests -v` 检查状态与 Hook 行为。模型是否实际读取关联对话、及时交稿、保持提示词精简，需要在真实讨论对话按 [行为场景](tests/behavior-cases.md) 检查，不能用脚本通过替代。
 
 ## English
 
-**Task Clarifier turns an unfinished request into a clear, concise prompt and recommends a suitable model and reasoning effort.** Start with voice or text, add details as they occur to you, and correct misunderstandings without rebuilding the prompt from scratch. It keeps one evolving brief, asks only about missing information that could change the direction, then returns a copy-ready prompt with model, reasoning-effort, and collaboration recommendations.
+**Task Clarifier turns an unfinished request into a clear, concise prompt and recommends a suitable model and reasoning effort.** Start with voice or text, add details as they occur to you, and correct misunderstandings without rebuilding the prompt from scratch. Explicit work requests and sufficiently clear tasks receive a copy-ready prompt in the same turn; you do not need to separately ask for a prompt. It asks only about essential scope ambiguities and respects requests to discuss first. A request to write a requirements document produces a prompt for the work chat to write it.
 
 ~~~mermaid
 flowchart LR

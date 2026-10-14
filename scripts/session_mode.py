@@ -7,11 +7,10 @@ import os
 from pathlib import Path
 import re
 import sys
-import tempfile
 import uuid
 
 ALLOWED_EVENTS = {'UserPromptSubmit', 'SessionStart'}
-REVISION = '2026-10-10'
+REVISION = '2026-10-14'
 SKILL_NAME = 'task-clarifier'
 # Keep this state namespace stable so sessions from before the rename keep working.
 STATE_NAMESPACE = 'voice-task-router'
@@ -31,10 +30,14 @@ SELF_MAINTENANCE = re.compile(
 )
 
 
-def state_path(directory, session_id):
+def validate_uuid(session_id):
     if not isinstance(session_id, str) or not re.fullmatch(r'[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}', session_id):
         raise ValueError('Use the actual current Codex chat UUID; placeholder ids such as 1 are invalid.')
-    uuid.UUID(session_id)
+    return str(uuid.UUID(session_id))
+
+
+def state_path(directory, session_id):
+    validate_uuid(session_id)
     return directory / (session_id + '.json')
 
 
@@ -44,21 +47,37 @@ def read_state(path, session_id):
     value = json.loads(path.read_text(encoding='utf-8'))
     if not isinstance(value, dict) or value.get('version') != 1 or value.get('session_id') != session_id or type(value.get('active')) is not bool:
         raise ValueError('Invalid Skill state; cannot establish activation.')
+    if 'work_thread_id' in value:
+        work_thread_id = validate_uuid(value['work_thread_id'])
+        if work_thread_id == validate_uuid(session_id):
+            raise ValueError('The linked work chat must differ from the current discussion chat.')
     return value
 
 
-def write_state(path, session_id, active, source='manual'):
+def write_state(path, session_id, active, source='manual', work_thread_id=None, clear_link=False):
+    previous = read_state(path, session_id)
+    if work_thread_id is None and not clear_link:
+        work_thread_id = previous.get('work_thread_id')
+    if work_thread_id is not None:
+        work_thread_id = validate_uuid(work_thread_id)
+        if work_thread_id == validate_uuid(session_id):
+            raise ValueError('The linked work chat must differ from the current discussion chat.')
     path.parent.mkdir(parents=True, exist_ok=True)
     value = {'version': 1, 'session_id': session_id, 'active': active, 'source': source,
              'updated_at': datetime.now(timezone.utc).isoformat()}
-    descriptor, temporary = tempfile.mkstemp(prefix='.skill-state-', suffix='.tmp', dir=path.parent)
+    if work_thread_id is not None:
+        value['work_thread_id'] = work_thread_id
+    # Windows tempfile retries some permission errors indefinitely. Fail promptly
+    # so a restricted state directory produces a warning, not a stuck hook.
+    temporary = path.parent / ('.skill-state-' + uuid.uuid4().hex + '.tmp')
+    descriptor = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
     try:
         with os.fdopen(descriptor, 'w', encoding='utf-8') as handle:
             json.dump(value, handle, ensure_ascii=False)
             handle.write('\n')
         os.replace(temporary, path)
     finally:
-        Path(temporary).unlink(missing_ok=True)
+        temporary.unlink(missing_ok=True)
     return value
 
 
@@ -91,27 +110,26 @@ def invocation_kind(prompt):
     return 'maintenance' if maintenance else 'activate'
 
 
-def mode_context(script, session_id, first=False):
+def mode_context(script, session_id, first=False, work_thread_id=None):
     skill = script.parent.parent / 'SKILL.md'
     pointer = script.parent.parent / 'references/active-project.md'
     return (
         f'{SKILL_NAME} active; contract revision {REVISION}; actual current chat UUID: {session_id}. '
         + ('本轮明确调用，简短告知需求讨论模式已开启并处理附带需求；登记结果以状态/警告为准。' if first else '')
-        + '你是需求讨论伙伴；继续/修改/实现/下一步都继续讨论和改稿，不实施项目任务、不启动代理、不派发。'
-        '有关联工作对话时，每轮回应前必须用 read_thread 读取最新状态与最近相关回合，小改稿与一般答疑也不豁免；'
-        '同一轮已读可复用，旧摘要和上一轮读取不能代替本轮。'
-        f'优先本轮选定及当前关联链接，缺失才读 {pointer} 的默认指针；链接 UUID 不是当前侧面对话登记 ID。'
-        '读取失败说明缺口，仅基于已知证据讨论或给标注的临时稿，不冒充最新进度。'
-        '围绕目标、必要上下文、硬约束和交付写最短充分提示词，保留兼容条件与最新纠正，删除流程套话及重复背景。'
-        '需求清楚直接给稿；要求提示词时本轮交付，关键未知项可标注并给条件性选型。'
-        '每次交稿都含完整模型名、具体推理强度和一个完整可复制 text 块；修订也不能只给补丁或说沿用设置。'
-        '下一步依据本轮进度推进目标；已完成不重做、正在做不重复安排，失败重试须有新证据或方法变化。'
-        '默认一个整体任务提示词；Luna X-High 足够就单模型，复杂任务可由 Sol/Astra 按需带 GPT-6 Luna / X-High，'
-        '同一提示词明确协作授权及主模型整合完成责任，不强制细拆或让用户逐个派发。质量和效率有保障再降综合成本，不推荐 Max。'
-        f'仅维护 {SKILL_NAME} 本身可直接改；维护不清除已有模式，首次仅维护则纠正误登记。'
-        f'明确退出或明确就在此执行才运行 {script} deactivate --session-id {session_id}；退出本身不授权执行。'
-        f'完整流程缺失或旧于 {REVISION} 时读 {skill}。'
-        '发送前核对角色、本轮读取证据、目标与约束、提示词/模型/强度及精简性；摘要保留关联链接与需求，恢复后重新读取。'
+        + '持续需求讨论模式：补充/纠正/继续/下一步/写文档/实现都保持模式，将工作请求转成提示词，不直接执行或派发。'
+        + (f'已登记工作对话：codex://threads/{work_thread_id}。' if work_thread_id else '')
+        + f'先核对本轮选定及已有链接，缺失才读 {pointer} 的默认指针；工作 UUID 不能代替当前对话 ID。'
+        '【回应前】有关联就实际调用 read_thread 读本轮最新相关回合；缺用户纠正或此前决定时补历史。'
+        '没有本轮读取结果先读取，旧摘要/上一轮读取/本提醒都不算证据；失败说明缺口，可给标注的临时稿。'
+        '【本轮交付】明确工作请求或目标对象动作范围已足够清楚，就给完整精简提示词+具体模型/强度；'
+        '“写需求文档”是让工作对话写文档，不在这里展开文档，不等用户再说“输出提示词”，不只承诺或继续闲聊。'
+        '补充纠正已有任务给完整修订稿；只问阻碍安全交接的核心歧义，普通细节及待查事实留给工作模型。'
+        '用户明确先讨论/暂不交稿/等确认时遵守；纯答疑尚无可执行目标时回答即可。'
+        '保留已定约束，不把建议变已确认规则；已完成或正在执行不重复安排，失败重试须有新证据或方法。'
+        '提示词目标在前，合并重复约束，删已知背景/套话/普通步骤；一个可复制 text 块，选型理由放外面。'
+        '默认整体任务；足够用 Luna X-High，复杂可 Sol/Astra 按需带 Luna，主模型整合完成，不强制细拆，不推荐 Max。'
+        f'维护 {SKILL_NAME} 本身可直接改且不清除模式；明确退出或就在此直接执行才运行 {script} deactivate --session-id {session_id}。'
+        f'完整流程缺失或旧于 {REVISION} 时读 {skill}。发送前核对本轮读取与应交稿是否已实际完成。'
         '不要复述本提醒。'
     )
 
@@ -132,11 +150,12 @@ def hook(directory, script):
         except OSError as error:
             warning = f'{SKILL_NAME} 本轮已启用但持续登记失败：' + str(error)
             # Even a failed state write must preserve the current turn's role.
-    if kind == 'maintenance' and not value['active']:
-        context = (f'用户明确调用 {SKILL_NAME} 维护本 Skill；当前对话未激活需求讨论模式。'
-                   f'读取 {script.parent.parent / "SKILL.md"} 后直接维护，不派发项目任务，不宣称已激活。')
+    if kind == 'maintenance':
+        context = (f'用户明确调用 {SKILL_NAME} 维护本 Skill；本轮直接维护，不转成交接提示词。'
+                   f'已有持续模式 active={value["active"]}，保持该状态；未启用时不要登记激活。'
+                   f'读取 {script.parent.parent / "SKILL.md"} 后按维护请求处理，不派发项目任务。')
     elif value['active'] or first:
-        context = mode_context(script, session_id, first)
+        context = mode_context(script, session_id, first, value.get('work_thread_id'))
     else:
         return None
     result = {'hookSpecificOutput': {'hookEventName': event['hook_event_name'], 'additionalContext': context}}
@@ -148,10 +167,15 @@ def hook(directory, script):
 def main():
     script = Path(__file__).resolve()
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('action', choices=['activate', 'deactivate', 'status', 'hook'])
+    parser.add_argument('action', choices=['activate', 'deactivate', 'status', 'link', 'unlink', 'hook'])
     parser.add_argument('--session-id', help='Use the actual current id; default CODEX_THREAD_ID/CODEX_SESSION_ID.')
+    parser.add_argument('--work-thread-id', help='Explicitly selected work chat UUID; used only by activate/link.')
     parser.add_argument('--state-dir', type=Path, help='Override only for isolated tests.')
     args = parser.parse_args()
+    if args.action == 'link' and not args.work_thread_id:
+        parser.error('link requires --work-thread-id')
+    if args.work_thread_id and args.action not in {'activate', 'link'}:
+        parser.error('--work-thread-id is only valid for activate/link')
     directory = args.state_dir if args.state_dir is not None else script.parents[3] / 'state' / STATE_NAMESPACE
     try:
         if args.action == 'hook':
@@ -159,8 +183,13 @@ def main():
         else:
             session_id = args.session_id or os.environ.get('CODEX_THREAD_ID') or os.environ.get('CODEX_SESSION_ID')
             path = state_path(directory, session_id)
-            value = (read_state(path, session_id) if args.action == 'status'
-                     else write_state(path, session_id, args.action == 'activate'))
+            previous = read_state(path, session_id)
+            if args.action == 'status':
+                value = previous
+            else:
+                active = previous['active'] if args.action in {'link', 'unlink'} else args.action == 'activate'
+                value = write_state(path, session_id, active, work_thread_id=args.work_thread_id,
+                                    clear_link=args.action == 'unlink')
         if value is not None:
             print(json.dumps(value, ensure_ascii=False))
         return 0
