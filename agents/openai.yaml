@@ -1,4 +1,4 @@
 interface:
   display_name: "需求澄清与模型选择"
-  short_description: "持续澄清目标，写精简任务提示词并推荐模型、推理强度和协作方式"
-  default_prompt: "使用 $task-clarifier 澄清目标；关联工作对话后每轮刷新进度，产出精简任务提示词并推荐模型、推理强度和必要的协作方式。"
+  short_description: "持续澄清需求，明确任务本轮交精简提示词，并推荐模型与推理强度"
+  default_prompt: "使用 $task-clarifier 持续澄清需求；有关联工作对话就每轮先读最新上下文，明确任务或需求足够清楚时本轮交精简提示词并推荐模型、强度和必要的协作。"
