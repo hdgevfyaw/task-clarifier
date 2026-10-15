@@ -6,7 +6,19 @@ Task Clarifier 是一个面向 Codex 的需求澄清与模型选择 Skill：把�
 
 你不必一开始就会写提示词，也不用把要求一次讲完。先说个大概，想到新条件时继续补充，发现理解错了就纠正。Skill 会维护同一份需求草稿，只追问影响核心目标和范围的问题；明确提出工作任务或需求足够清楚时，本轮就给精简提示词和模型、推理强度建议，无需再说“输出提示词”。
 
-## 本次更新｜2026-10-14
+## 本次更新｜2026-10-16
+
+- 需要协作时，把主模型职责、子智能体负责的工作、子模型与推理强度写进同一份可复制提示词；已推荐的必要人数与执行边界一并交接，避免只复制任务稿时丢失分工。
+- 简单任务或拆分无益的任务保持单模型，不强加子智能体、固定人数或细碎步骤；协作安排保持简短。
+- 补充两路只读核查、无需拆分和分工修订的验收场景。主模型仍由用户在工作对话选择，提示词不自动切换运行配置。
+
+## Latest update — 2026-10-16
+
+- Include necessary host/worker responsibilities, worker model and effort, and any recommended count or execution boundaries inside the copyable task prompt.
+- Keep simple or inseparable tasks single-agent; avoid fixed worker counts and unnecessary delegation boilerplate.
+- Add acceptance scenarios for two-track read-only work, single-agent tasks, and corrected assignments. Copying a prompt does not switch the selected host model.
+
+## 上次更新｜2026-10-14
 
 - 明确工作请求、可交接的需求及已有任务的补充纠正，本轮主动交提示词，减少连续讨论却迟迟不交稿；“先讨论、暂不交稿、确认后再写”的边界优先。
 - “写完整需求文档”等请求生成让工作对话执行的提示词；只追问核心目标或范围歧义，普通细节和待查事实交工作模型处理，未定规则不擅自补成要求。
@@ -16,7 +28,7 @@ Task Clarifier 是一个面向 Codex 的需求澄清与模型选择 Skill：把�
 - 新增隔离状态与 Hook 事件回归测试，覆盖连续跟进、启动与压缩恢复、关联替换、旧状态、退出及登记失败。脚本测试不代表真实模型行为已获保证。
 - 修正受限 Windows 目录中的状态写入可能长时间重试的问题；无权限时及时报出登记失败，继续处理本轮需求。
 
-## Latest update — 2026-10-14
+## Previous update — 2026-10-14
 
 - Deliver a prompt in the current turn for explicit work requests, sufficiently clear tasks, and task corrections; honor requests to discuss first or wait for confirmation.
 - Treat “write a requirements document” as a handoff to the work chat. Leave ordinary implementation details and research questions to that model without inventing confirmed requirements.
