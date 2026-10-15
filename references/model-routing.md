@@ -22,7 +22,7 @@ API defaults, model-catalog defaults, and the router's recommendation are differ
 
 Choose the model for the requested outcome, not for artificially tiny slices. Default to one overall prompt: Luna X-High for bounded work it can complete reliably; GPT-6.1 Sol Medium for coupled decisions and integration; High for difficult diagnosis, conflicting evidence or costly hidden errors; X-High only for a concrete depth benefit. Astra needs an identified capability gap. These are judgments, not guaranteed thresholds.
 
-For substantial delegable work, recommend a capable host with permission to use GPT-6 Luna / X-High as needed. Do not preassign worker count or exhaustive packages; the host discovers the scope and decides allocation, keeping final responsibility. Simple tasks stay single-agent, and tightly coupled complex tasks may also stay single-agent. Detailed breakdowns are for explicit user requests or material task dependencies.
+For substantial delegable work, recommend a capable host with GPT-6 Luna / X-High workers. Put the necessary host and worker responsibilities inside the copyable task prompt. Any concrete worker count or split actually recommended outside the prompt must also appear inside it; otherwise let the host discover scope and allocate details. Do not force a count or exhaustive packages. Simple tasks stay single-agent, and tightly coupled complex tasks may also stay single-agent.
 
 Use current available settings and concrete task evidence. Missing thread context, inaccessible files and repeated ungrounded prompts are not solved by higher effort. Diagnose repeated failures before suggesting a model change. Keep cost reasoning outside the copyable task prompt.
 
