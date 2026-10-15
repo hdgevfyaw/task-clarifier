@@ -6,13 +6,25 @@ Task Clarifier 是一个面向 Codex 的需求澄清与模型选择 Skill：把�
 
 你不必一开始就会写提示词，也不用把要求一次讲完。先说个大概，想到新条件时继续补充，发现理解错了就纠正。Skill 会维护同一份需求草稿，只追问影响核心目标和范围的问题；明确提出工作任务或需求足够清楚时，本轮就给精简提示词和模型、推理强度建议，无需再说“输出提示词”。
 
-## 本次更新｜2026-10-16
+## 本次更新｜2026-10-16：安装与使用说明
+
+- 补全 GitHub 安装和上手步骤，提供 Codex 内通过 **$skill-installer** 安装的推荐方法，以及手动安装路径。
+- 明确安装 Skill 本身不需要终端或 Hook 配置；Hook 只是可选的持续模式辅助功能，需要时再单独配置和信任。
+- 补充从调用 Skill、持续补充需求，到复制提示词交给工作对话执行的完整流程。
+
+## GitHub 文档更新 — Installation and usage｜2026-10-16
+
+- Add step-by-step installation and usage instructions, including the recommended **$skill-installer** flow and a manual option.
+- Clarify that installing the skill does not require terminal or Hook setup; Hooks are optional and can be configured separately.
+- Show the complete handoff flow from invoking the skill to copying its prompt into a work chat.
+
+## 功能更新｜2026-10-16
 
 - 需要协作时，把主模型职责、子智能体负责的工作、子模型与推理强度写进同一份可复制提示词；已推荐的必要人数与执行边界一并交接，避免只复制任务稿时丢失分工。
 - 简单任务或拆分无益的任务保持单模型，不强加子智能体、固定人数或细碎步骤；协作安排保持简短。
 - 补充两路只读核查、无需拆分和分工修订的验收场景。主模型仍由用户在工作对话选择，提示词不自动切换运行配置。
 
-## Latest update — 2026-10-16
+## Feature update — 2026-10-16
 
 - Include necessary host/worker responsibilities, worker model and effort, and any recommended count or execution boundaries inside the copyable task prompt.
 - Keep simple or inseparable tasks single-agent; avoid fixed worker counts and unnecessary delegation boilerplate.
@@ -171,12 +183,32 @@ Hook 是可选的，需要用户在 Codex 环境中自行配置并信任；仓�
 
 ## 安装
 
-把整个仓库目录放进 Codex 的 skills 目录，保留 **SKILL.md**、**agents/**、**references/** 和 **scripts/** 的相对结构：
+### 推荐：在 Codex 里安装（无需终端）
 
-- 设置了 **CODEX_HOME**：放到 **CODEX_HOME/skills/task-clarifier/**
-- 未设置时通常放到 **~/.codex/skills/task-clarifier/**
+1. 在 Codex 中开一个对话，调用 **$skill-installer**。
+2. 发送：**请从 GitHub 仓库 hdgevfyaw/task-clarifier 安装 Task Clarifier。**
+3. 安装完成后，新开一个对话并调用 **$task-clarifier**。
 
-安装后，在新对话开头明确调用 **$task-clarifier**。
+如果安装后暂时找不到 Skill，重启 Codex 再试。也可以在 Codex 的 Skills 选择器中查找 **Task Clarifier**。
+
+### 手动安装
+
+下载并解压[本仓库 ZIP](https://github.com/hdgevfyaw/task-clarifier/archive/refs/heads/main.zip)，将解压出的文件夹改名为 **task-clarifier**，再放进用户级 Skills 目录。保留 **SKILL.md**、**agents/**、**references/** 和 **scripts/** 的相对结构：
+
+- Windows 默认位置：**%USERPROFILE%\.codex\skills\task-clarifier\**
+- macOS/Linux 默认位置：**~/.codex/skills/task-clarifier/**
+- 如果设置了 **CODEX_HOME**：放到 **CODEX_HOME/skills/task-clarifier/**
+
+然后新开一个对话，调用 **$task-clarifier**。Codex 通常会自动发现新增或更新的 Skill；若没有出现，重启 Codex。更多信息见 [Codex Skills 官方说明](https://learn.chatgpt.com/docs/build-skills)。
+
+### 基本使用流程
+
+1. 在新对话中调用 **$task-clarifier**，用平常的说法讲目标；可以一次说完，也可以先说大概。继续已有工作时，同时提供工作对话链接 **codex://threads/<工作对话 UUID>**，让 Skill 先读取该对话的最新进度。
+2. 继续补充、纠正或调整需求。有关联的工作对话时，每轮回应前都应先读取其最新状态和相关回合；若缺少链接或读取失败，Skill 会说明缺口。若需求缺少会改变目标或方案的关键信息，Skill 会优先问清；其余细节可以交给工作阶段处理。
+3. 目标足够清楚或你明确提出工作请求时，Skill 会交付精简、可复制的执行提示词，并建议模型与推理强度。只有确实有帮助时，才会把主模型和子智能体的分工写进提示词。
+4. 复制提示词到负责实际工作的 Codex 对话；模型选择由你在该工作对话中确认，Task Clarifier 不会替你启动或执行那项工作。
+
+安装 Skill 不需要配置 Hook 或打开终端。Hook 仅用于需要自动恢复持续讨论状态等进阶场景：用户需另行配置，并在 Codex 中审阅和信任；具体机制见 [Codex Hooks 官方说明](https://learn.chatgpt.com/docs/hooks)。
 
 ## 行为边界与隐私
 
@@ -224,7 +256,15 @@ flowchart LR
 
 Start a new Codex conversation with **$task-clarifier** and a natural request, such as “I want to plan a club event signup app. Help clarify the requirements first; do not write code yet.” Follow up with ordinary messages like “add this constraint,” “correction,” or “give me the final prompt.” You decide when to copy the result into a work conversation; the skill does not automatically execute project work.
 
-See the Chinese sections above for the detailed walkthrough, installation, architecture, privacy boundaries, and repository contents.
+## Install and use
+
+**Recommended (no terminal required):** In a new Codex chat, invoke **$skill-installer** and ask: “Install Task Clarifier from the GitHub repository `hdgevfyaw/task-clarifier`.” Then open a new chat and invoke **$task-clarifier**. If it does not appear, restart Codex. For manual setup, [download the repository ZIP](https://github.com/hdgevfyaw/task-clarifier/archive/refs/heads/main.zip), rename its extracted folder to `task-clarifier`, and place it in `~/.codex/skills/task-clarifier/` (Windows: `%USERPROFILE%\.codex\skills\task-clarifier\`), preserving `SKILL.md`, `agents/`, `references/`, and `scripts/`. See the [official Skills guide](https://learn.chatgpt.com/docs/build-skills).
+
+Describe your goal naturally, then add or correct details as they come to mind. When continuing existing work, provide its `codex://threads/<work-chat-UUID>` link; the skill should read the latest relevant context before each reply. When the task is clear, or you explicitly ask for a work prompt, Task Clarifier gives you a concise, copy-ready prompt with model and reasoning-effort recommendations. It includes host/worker assignments only when delegation would help. Copy the prompt into the work chat; Task Clarifier does not run the task for you.
+
+**Hooks are optional.** Installing or using the skill does not require terminal setup or Hooks. Hooks are only for advanced session-state assistance and must be configured, reviewed, and trusted separately. See the [official Hooks guide](https://learn.chatgpt.com/docs/hooks).
+
+See the Chinese sections above for the full walkthrough, behavior boundaries, privacy details, and repository contents.
 
 ## License
 
